@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Boarding {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  password    String
+  address     String?
+  memberCount Int?
+  members     Member[]
+  chats       Chat[]
+  polls       Poll[]
+  keyLocation String?
+  updatedAt   DateTime @updatedAt
+}
+
+model Member {
+  id         String   @id @default(cuid())
+  name       String
+  indexNo    String?
+  contact    String?
+  email      String?
+  isInside   Boolean  @default(false)
+  isPaid     Boolean  @default(false)
+  boarding   Boarding @relation(fields: [boardingId], references: [id], onDelete: Cascade)
+  boardingId String
+  createdAt  DateTime @default(now())
+
+  votes Vote[]
+}
+
+model Chat {
+  id         String   @id @default(cuid())
+  content    String
+  mediaUrl   String? // for later: images/videos storage url
+  senderName String
+  boarding   Boarding @relation(fields: [boardingId], references: [id], onDelete: Cascade)
+  boardingId String
+  createdAt  DateTime @default(now())
+}
+
+model Poll {
+  id         String       @id @default(cuid())
+  mealType   String // breakfast|lunch|dinner or freeform
+  shopName   String?
+  boarding   Boarding     @relation(fields: [boardingId], references: [id], onDelete: Cascade)
+  boardingId String
+  options    PollOption[]
+  createdAt  DateTime     @default(now())
+}
+
+model PollOption {
+  id     String @id @default(cuid())
+  text   String
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  pollId String
+  votes  Vote[]
+}
+
+model Vote {
+  id        String     @id @default(cuid())
+  member    Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId  String
+  option    PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  optionId  String
+  createdAt DateTime   @default(now())
+}
