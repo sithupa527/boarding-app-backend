@@ -6,7 +6,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const tokenData = await getBoardingFromReq(req);
     if (!tokenData) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const pollId = params.id;
+    //const pollId = params.id;
     const { memberId, optionId } = await req.json();
     if (!memberId || !optionId) return NextResponse.json({ error: "memberId and optionId required" }, { status: 400 });
 
