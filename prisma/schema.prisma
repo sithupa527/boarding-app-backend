@@ -21,16 +21,18 @@ model Boarding {
 }
 
 model Member {
-  id         String   @id @default(cuid())
-  name       String
-  indexNo    String?
-  contact    String?
-  email      String?
-  isInside   Boolean  @default(false)
-  isPaid     Boolean  @default(false)
-  boarding   Boarding @relation(fields: [boardingId], references: [id], onDelete: Cascade)
-  boardingId String
-  createdAt  DateTime @default(now())
+  id               String   @id @default(cuid())
+  name             String
+  indexNo          String?
+  contact          String?
+  email            String?
+  address          String?
+  emergencyContact String?
+  isInside         Boolean  @default(false)
+  isPaid           Boolean  @default(false)
+  boarding         Boarding @relation(fields: [boardingId], references: [id], onDelete: Cascade)
+  boardingId       String
+  createdAt        DateTime @default(now())
 
   votes Vote[]
 }
