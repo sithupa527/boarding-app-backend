@@ -2,39 +2,13 @@ import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getBoardingFromReq } from "@/lib/auth";
 
-/**
- * Extracts the `id` param safely across all Next.js versions.
- * In Next.js 15+, `context.params` is a Promise resolving to { id: string }.
- */
 async function getId(context: { params: Promise<{ id: string }> } | { params: { id: string } }) {
-    if (!context || !("params" in context)) return null;
-
-    const maybePromise = context.params as any;
-    const params = typeof maybePromise.then === "function" ? await maybePromise : maybePromise;
-    return params?.id ?? null;
+    const maybePromise = (context as any)?.params;
+    return typeof maybePromise?.then === "function"
+        ? (await maybePromise)?.id
+        : maybePromise?.id ?? null;
 }
 
-// ------------------------
-// GET: Fetch single member
-// ------------------------
-export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-    try {
-        const id = await getId(context);
-        if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-
-        const member = await prisma.member.findUnique({ where: { id } });
-        if (!member) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-        return NextResponse.json(member);
-    } catch (err) {
-        console.error("GET /api/members/[id] error:", err);
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
-    }
-}
-
-// ------------------------
-// PUT: Update a member
-// ------------------------
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         const tokenData = await getBoardingFromReq(req);
@@ -42,46 +16,72 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const id = await getId(context);
-        if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+        if (!id)
+            return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
         const body = await req.json();
 
-        const existing = await prisma.member.findUnique({ where: { id } });
-        if (!existing || existing.boardingId !== tokenData.boardingId)
+        const member = await prisma.member.findUnique({ where: { id } });
+        if (!member || member.boardingId !== tokenData.boardingId)
             return NextResponse.json({ error: "Not permitted" }, { status: 403 });
 
+        // ------------------------------
+        // ENTER: Mark as inside
+        // ------------------------------
+        if (body.isInside === true) {
+            const updated = await prisma.member.update({
+                where: { id },
+                data: { isInside: true },
+            });
+
+            await prisma.boarding.update({
+                where: { id: tokenData.boardingId },
+                data: { keyLocation: null }, // clear last key location
+            });
+
+            return NextResponse.json(updated);
+        }
+
+        // ------------------------------
+        // LEAVE: Mark as outside
+        // ------------------------------
+        if (body.isInside === false) {
+            // find how many currently inside (excluding self)
+            const othersInside = await prisma.member.count({
+                where: {
+                    boardingId: tokenData.boardingId,
+                    isInside: true,
+                    NOT: { id },
+                },
+            });
+
+            const updated = await prisma.member.update({
+                where: { id },
+                data: { isInside: false },
+            });
+
+            // If last person leaving → record key location
+            if (othersInside === 0 && body.keyLocation) {
+                await prisma.boarding.update({
+                    where: { id: tokenData.boardingId },
+                    data: { keyLocation: body.keyLocation },
+                });
+            }
+
+            return NextResponse.json(updated);
+        }
+
+        // ------------------------------
+        // Any other updates (name, etc.)
+        // ------------------------------
         const updated = await prisma.member.update({
             where: { id },
             data: body,
         });
-
         return NextResponse.json(updated);
+
     } catch (err) {
         console.error("PUT /api/members/[id] error:", err);
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
-    }
-}
-
-// ------------------------
-// DELETE: Remove a member
-// ------------------------
-export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-    try {
-        const tokenData = await getBoardingFromReq(req);
-        if (!tokenData)
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-        const id = await getId(context);
-        if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-
-        const existing = await prisma.member.findUnique({ where: { id } });
-        if (!existing || existing.boardingId !== tokenData.boardingId)
-            return NextResponse.json({ error: "Not permitted" }, { status: 403 });
-
-        await prisma.member.delete({ where: { id } });
-        return NextResponse.json({ success: true });
-    } catch (err) {
-        console.error("DELETE /api/members/[id] error:", err);
         return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 }
