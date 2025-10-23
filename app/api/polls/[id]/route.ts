@@ -2,30 +2,30 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getBoardingFromReq } from "@/lib/auth";
 
-export async function POST(
-    req: Request,
-    context: { params: Promise<{ id: string }> }
-) {
+export async function POST(req: Request) {
     const tokenData = await getBoardingFromReq(req);
     if (!tokenData)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { id: pollId } = await context.params; // optional if you want to use pollId
-    const { memberId, optionId } = await req.json();
+    const { action, optionId }: { action: "yes" | "no" | "undoYes" | "undoNo"; optionId: string } = await req.json();
 
-    if (!memberId || !optionId)
-        return NextResponse.json(
-            { error: "memberId and optionId required" },
-            { status: 400 }
-        );
+    if (!optionId)
+        return NextResponse.json({ error: "Invalid option" }, { status: 400 });
 
-    const member = await prisma.member.findUnique({ where: { id: memberId } });
-    if (!member || member.boardingId !== tokenData.boardingId)
-        return NextResponse.json({ error: "Invalid member" }, { status: 403 });
+    const map = {
+        yes: { yesCount: { increment: 1 } },
+        no: { noCount: { increment: 1 } },
+        undoYes: { yesCount: { decrement: 1 } },
+        undoNo: { noCount: { decrement: 1 } },
+    } as const;
 
-    const vote = await prisma.vote.create({
-        data: { memberId, optionId },
+    // ✅ Fix TypeScript error by casting map[action] explicitly
+    const data = map[action] as unknown as Parameters<typeof prisma.pollOption.update>[0]["data"];
+
+    const updated = await prisma.pollOption.update({
+        where: { id: optionId },
+        data,
     });
 
-    return NextResponse.json(vote);
+    return NextResponse.json(updated);
 }

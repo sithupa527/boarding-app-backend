@@ -33,8 +33,6 @@ model Member {
   boarding         Boarding @relation(fields: [boardingId], references: [id], onDelete: Cascade)
   boardingId       String
   createdAt        DateTime @default(now())
-
-  votes Vote[]
 }
 
 model Chat {
@@ -58,18 +56,10 @@ model Poll {
 }
 
 model PollOption {
-  id     String @id @default(cuid())
-  text   String
-  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  pollId String
-  votes  Vote[]
-}
-
-model Vote {
-  id        String     @id @default(cuid())
-  member    Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  memberId  String
-  option    PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
-  optionId  String
-  createdAt DateTime   @default(now())
+  id       String @id @default(cuid())
+  text     String
+  poll     Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  pollId   String
+  yesCount Int    @default(0)
+  noCount  Int    @default(0)
 }
