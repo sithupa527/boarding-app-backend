@@ -32,6 +32,7 @@ model Member {
   isPaid           Boolean  @default(false)
   boarding         Boarding @relation(fields: [boardingId], references: [id], onDelete: Cascade)
   boardingId       String
+  fcmToken         String?
   createdAt        DateTime @default(now())
 }
 
